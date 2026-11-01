@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07080f">
+  <meta name="description" content="引溯：带编号引用的广告行业 RAG 顾问。本地 BM25 检索，不调用 API，知识库没有依据就拒答。">
+  <title>引溯 · 带引用的行业 RAG 顾问</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-view="chat">
+  <a class="skip" href="#thread">跳到对话</a>
+  <header class="topbar">
+    <button class="brand" type="button" data-nav="chat">
+      <svg class="mark" viewBox="0 0 36 36" aria-hidden="true">
+        <rect x="1" y="1" width="34" height="34" rx="9" fill="#07080f" stroke="url(#ys-grad)" stroke-width="1.4"/>
+        <path d="M10 26V10h10.2a6.2 6.2 0 0 1 0 12.4H10" fill="none" stroke="url(#ys-grad)" stroke-width="1.8"/>
+        <circle cx="25.5" cy="25.5" r="2.2" fill="#22d3ee"/>
+        <defs>
+          <linearGradient id="ys-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop stop-color="#22d3ee"/>
+            <stop offset="1" stop-color="#a855f7"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span>
+        <strong>引溯</strong>
+        <em>带引用的行业 RAG 顾问</em>
+      </span>
+    </button>
+    <nav class="nav" aria-label="页面">
+      <button type="button" data-nav="chat" aria-pressed="true">对话</button>
+      <button type="button" data-nav="trace" class="only-narrow">轨迹</button>
+      <button type="button" data-nav="arch" aria-pressed="false">架构</button>
+      <button type="button" data-nav="eval" aria-pressed="false">评测</button>
+    </nav>
+    <p class="badge">本地 BM25 · 无 API Key</p>
+  </header>
+
+  <div class="layout">
+    <section class="view-chat" id="view-chat" aria-label="对话">
+      <div class="thread" id="thread">
+        <div class="thread-inner">
+          <div class="hero" id="hero">
+            <p class="kicker">HenryHwang-AI · 广告合规演示</p>
+            <h1>问之前，先能指回原文。</h1>
+            <p class="lede">这个顾问只根据浏览器里的 12 条合成制度回答。每句结论带编号，点开就是来源和高亮句。知识库没有的，直接拒答，不拿常识补。</p>
+            <ol class="beats">
+              <li><span>01</span>词法检索，不调用嵌入接口</li>
+              <li><span>02</span>编号引用，卡片里核对原句</li>
+              <li><span>03</span>侧栏看见召回、重排和阈值</li>
+            </ol>
+            <div class="starters" id="starters"></div>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="composer-inner">
+          <p id="follow-hint" class="follow-hint" hidden></p>
+          <div id="example-list" class="example-list" hidden></div>
+          <div class="composer-box">
+            <label class="sr" for="q">问题</label>
+            <textarea id="q" rows="2" placeholder="问一个广告合规、审核或案例口径的问题"></textarea>
+            <div class="composer-bar">
+              <button type="button" class="tool" id="btn-examples" aria-expanded="false">示例问题</button>
+              <button type="button" class="tool" id="btn-clear">清空</button>
+              <span class="spacer"></span>
+              <span class="hint">Enter 发送 · Shift+Enter 换行</span>
+              <button type="button" class="send" id="btn-send">发送</button>
+            </div>
+          </div>
+          <p class="disclaimer">合成语料，仅供作品集演示，不构成法律或合规意见。回答留在这台浏览器里。</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel-trace" id="panel-trace" aria-label="检索轨迹">
+      <div class="panel-head">
+        <p class="kicker">Retrieval trace</p>
+        <h2>检索轨迹</h2>
+      </div>
+      <div class="panel-body" id="trace-body"></div>
+    </aside>
+
+    <section class="view-arch" id="view-arch" aria-label="架构决策">
+      <article class="doc arch">
+        <p class="kicker">Product decisions</p>
+        <h2>架构与产品决策</h2>
+        <p class="lede">这是给面试用的决策记录：分块、引用、拒答、评测，以及为什么演示停在可解释的词法检索。</p>
+        <ol class="stepper">
+          <li>问句</li>
+          <li>多轮改写</li>
+          <li>词表 + 二元组</li>
+          <li>BM25</li>
+          <li>重排替身</li>
+          <li>阈值</li>
+          <li>引用或拒答</li>
+        </ol>
+        <p class="cfg" id="cfg-line">参数加载中。</p>
+
+        <div class="arch-grid">
+          <section class="decision-card">
+            <p class="index-no">01 · 分块</p>
+            <h3>按「能单独引用的主张」切，不按固定字数切。</h3>
+            <p>12 条知识各自是一个主张：红线、SOP、案例或数据边界。正文大约 180–320 字，结论句和操作细节在同一块里。回答时抽出其中 1–2 句原文，编号指向整块。</p>
+            <div class="split">
+              <div>
+                <h4>这样切</h4>
+                <p>卡片扫得动，BM25 不会被一整章无关段落稀释。审计时能指出「引用的是哪一条」。</p>
+              </div>
+              <div>
+                <h4>代价</h4>
+                <p>句级切片会把红线和审核动作拆开，回答容易只引用半句。章级切片则让高亮失去焦点。生产环境会在条款和案例两种模板上保留结论句重叠，避免两块重复引用同一句。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="decision-card">
+            <p class="index-no">02 · 引用</p>
+            <h3>先给原文结论，编号必须能点到来源卡片。</h3>
+            <p>编号对应知识块，不对应句子序号。同一张卡片可以支撑两句。卡片展示标题、出处、类目，以及命中句里的检索词高亮。全文默认收起。</p>
+            <div class="split">
+              <div>
+                <h4>这样设计</h4>
+                <p>读者先判断这句话够不够用，再决定要不要打开原文。高亮的是问句里的术语，方便核对「是不是答非所问」。</p>
+              </div>
+              <div>
+                <h4>守住的边界</h4>
+                <p>低于阈值的文档只出现在检索轨迹里，不进回答，避免「看起来有出处」。回答句必须是原文子串，演示里没有生成模型扩写。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="decision-card">
+            <p class="index-no">03 · 拒答</p>
+            <h3>没有区分度的词项，或重排分不够，就明确拒答。</h3>
+            <p>回答要同时满足：命中至少一个低频词表项，重排分不低于绝对阈值，并且不低于第一名的相对比例。除第一名外，还要命中问句里的低频词，避免只因为共享「落地页」这类宽词就被引用。</p>
+            <div class="split">
+              <div>
+                <h4>拒答时给什么</h4>
+                <p>固定说明原因。完全对不上术语时，建议四个类目的文档；分数接近但没过线时，列出未达阈值的近邻标题。不把近邻写成引用。</p>
+              </div>
+              <div>
+                <h4>多轮</h4>
+                <p>「再展开审核步骤」会带上上一轮的术语。新主题，例如转到落地页，不继承旧词。长问题如果一个词都对不上，也不会借上一轮的结论硬答。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="decision-card">
+            <p class="index-no">04 · 评测</p>
+            <h3>先跑金标，再谈手感。</h3>
+            <p>内置 11 条应回答、2 条应拒答。应回答的金标文档必须出现在重排前三，并且全部被引用。另有 1 条同义改写观察项，不计入通过率，用来暴露词法检索对齐不了「整形 / 打包票」和「医疗美容 / 不得保证治愈」。</p>
+            <div class="split">
+              <div>
+                <h4>三个数</h4>
+                <p>Recall@3、拒答准确率、引用忠实（编号必须来自本次越过阈值的块）。作品集里的上线门槛：Recall@3 为 1，拒答样本全部正确，引用忠实为 100%。</p>
+              </div>
+              <div>
+                <h4>这套金标盖不到的</h4>
+                <p>问题仍使用知识库里的术语。它守的是「写进去的条款能被引用」，不承诺口语改写。要盖住改写，需要混合检索，而不是把阈值调松。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="decision-card">
+            <p class="index-no">05 · 检索</p>
+            <h3>演示用 BM25，是为了零密钥、可离线和可解释。</h3>
+            <p>中文走领域词表的包含匹配，再加字二元组。二元组里带「的、了、是」的不进索引。BM25 的文档长度用字数，避免二元组把长度撑爆。词表项权重大于二元组。重排分把饱和后的 BM25、最佳句的术语覆盖、标题命中合在一起。饱和是为了避免「一堆 1 分里的第一名」在除以自己之后变成满分。</p>
+            <p>小语料、术语密的时候，这条链路足够支撑引用和拒答。生产方案是 BM25 与向量混合，交叉编码器只重排前 20 条。这里的重排分会在轨迹底部写明公式，避免被讲成模型分数。</p>
+          </section>
+        </div>
+
+        <h2 class="catalog-title">知识库目录</h2>
+        <p class="lede">全部是虚构的 SOP、红线和案例。字段在 <code>data/kb.json</code>，页面实际读取内嵌的 <code>js/kb.js</code>，这样直接打开文件也能用。</p>
+        <div id="kb-catalog"></div>
+      </article>
+    </section>
+
+    <section class="view-eval" id="view-eval" aria-label="评测集">
+      <article class="doc eval">
+        <p class="kicker">Eval set</p>
+        <h2>评测集</h2>
+        <p class="lede">在浏览器里跑同一套引擎。金标是公开的：这是产品门槛，不是隐藏考卷。</p>
+        <p><button type="button" class="run" id="btn-eval">运行评测</button></p>
+        <div id="eval-root"></div>
+      </article>
+    </section>
+  </div>
+
+  <p id="live-status" class="sr" aria-live="polite"></p>
+  <noscript>需要启用 JavaScript。脚本和知识库都在本地，不会上传问题。</noscript>
+  <script src="js/kb.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
